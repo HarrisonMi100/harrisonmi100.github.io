@@ -298,35 +298,19 @@ function tradingDaysAgo(n) {
 }
 
 async function fetchCandles(ticker) {
-  // Try multiple CORS proxies in sequence until one works
-  const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=20d`;
-  const proxies = [
-    `https://corsproxy.io/?${encodeURIComponent(yahoo)}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(yahoo)}`,
-    `https://thingproxy.freeboard.io/fetch/${yahoo}`,
-  ];
-
-  for (const proxyUrl of proxies) {
-    try {
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) continue;
-      const raw = await res.text();
-      // allorigins wraps in {contents:...}, others return raw JSON
-      let data;
-      try {
-        const wrapper = JSON.parse(raw);
-        data = wrapper.contents ? JSON.parse(wrapper.contents) : wrapper;
-      } catch(e) { continue; }
-      const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
-      if (!closes || closes.length < 2) continue;
-      const clean = closes.filter(v => v !== null && v !== undefined && v > 0);
-      if (clean.length < 5) continue;
-      return { c: clean };
-    } catch(e) {
-      continue; // try next proxy
-    }
-  }
-  return null;
+  // corsproxy.io - single fast proxy, 5s timeout
+  try {
+    const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=20d`;
+    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(yahoo)}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+    if (!closes || closes.length < 2) return null;
+    const clean = closes.filter(v => v !== null && v !== undefined && v > 0);
+    return clean.length >= 5 ? { c: clean } : null;
+  } catch(e) { return null; }
 }
 
 async function fetchQuote(ticker) {
@@ -367,52 +351,38 @@ async function fetchAllPrices() {
   document.getElementById("progress-wrap").classList.remove("hidden");
   document.getElementById("refresh-wrap").classList.add("hidden");
 
-  // Phase 1: fetch all quotes first (Finnhub, fast) — populates 1D immediately
-  for (let i = 0; i < WATCHLIST.length; i++) {
-    const s = WATCHLIST[i];
-    const pct = Math.round(((i+1)/WATCHLIST.length)*50);
-    document.getElementById("progress-label").textContent = `Quotes: ${s.ticker} (${pct}%)`;
-    document.getElementById("progress-fill").style.width = pct + "%";
-    try {
-      const quote = await fetchQuote(s.ticker);
-      const d1 = (quote.c && quote.pc && quote.pc !== 0) ? ((quote.c - quote.pc)/quote.pc*100) : null;
-      priceData[s.ticker] = {
-        current: quote.c || null,
-        prevClose: quote.pc || null,
-        change1d: d1,
-        d1, d5: null, d10: null, candles: null,
-      };
-    } catch(e) {
-      priceData[s.ticker] = { error: true };
-    }
-    await new Promise(r => setTimeout(r, 150));
-    renderAll();
-  }
+  // Fetch all quotes AND candles in parallel batches of 6
+  const BATCH = 6;
+  document.getElementById("progress-label").textContent = "Fetching prices…";
 
-  // Phase 2: fetch historical candles one at a time with 800ms gap to avoid rate limiting
-  for (let i = 0; i < WATCHLIST.length; i++) {
-    const s = WATCHLIST[i];
-    const pct = 50 + Math.round(((i+1)/WATCHLIST.length)*50);
-    document.getElementById("progress-label").textContent = `History: ${s.ticker} (${pct}%)`;
-    document.getElementById("progress-fill").style.width = pct + "%";
-    if (priceData[s.ticker]?.error) continue;
-    try {
-      let candles = await fetchCandles(s.ticker);
-      if (!candles) {
-        await new Promise(r => setTimeout(r, 1500));
-        candles = await fetchCandles(s.ticker);
+  for (let i = 0; i < WATCHLIST.length; i += BATCH) {
+    const batch = WATCHLIST.slice(i, i + BATCH);
+    const pct = Math.round(((i + BATCH) / WATCHLIST.length) * 100);
+    document.getElementById("progress-label").textContent = `Loading… ${Math.min(pct,100)}%`;
+    document.getElementById("progress-fill").style.width = Math.min(pct,100) + "%";
+
+    await Promise.all(batch.map(async (s) => {
+      try {
+        const [quote, candles] = await Promise.all([
+          fetchQuote(s.ticker),
+          fetchCandles(s.ticker)
+        ]);
+        const d1 = (quote.c && quote.pc && quote.pc !== 0) ? ((quote.c - quote.pc)/quote.pc*100) : null;
+        priceData[s.ticker] = {
+          current: quote.c || null,
+          prevClose: quote.pc || null,
+          change1d: d1, d1,
+          d5: calcDrop(quote.c, candles, 5),
+          d10: calcDrop(quote.c, candles, 10),
+          candles,
+        };
+      } catch(e) {
+        priceData[s.ticker] = { error: true };
       }
-      if (!candles) {
-        await new Promise(r => setTimeout(r, 2500));
-        candles = await fetchCandles(s.ticker);
-      }
-      const currentPrice = priceData[s.ticker]?.current;
-      priceData[s.ticker].candles = candles;
-      priceData[s.ticker].d5 = calcDrop(currentPrice, candles, 5);
-      priceData[s.ticker].d10 = calcDrop(currentPrice, candles, 10);
-    } catch(e) {}
-    await new Promise(r => setTimeout(r, 800));
+    }));
+
     renderAll();
+    await new Promise(r => setTimeout(r, 300)); // small pause between batches
   }
 
   document.getElementById("progress-wrap").classList.add("hidden");
