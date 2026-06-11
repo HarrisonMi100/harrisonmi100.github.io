@@ -108,6 +108,19 @@
   .speed-guide-row:last-child { border-bottom: none; }
   .speed-icon { width: 22px; flex-shrink: 0; font-size: 13px; }
   .disclaimer { padding: 12px; background: #0c1a0c; border: 1px solid #166534; border-radius: 10px; font-size: 11px; color: #86efac; line-height: 1.6; }
+  /* AI Analysis styles */
+  .ai-btn { background: #1e1b4b; border: 1px solid #3730a3; color: #818cf8; padding: 3px 10px; border-radius: 5px; cursor: pointer; font-size: 10px; font-weight: 600; white-space: nowrap; margin-left: auto; flex-shrink: 0; }
+  .ai-btn:hover { background: #2e1b6b; }
+  .ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ai-btn.loading { color: #a78bfa; }
+  .ai-answer { margin-top: 6px; padding: 8px 10px; background: #0d1117; border-left: 2px solid #3730a3; border-radius: 0 6px 6px 0; font-size: 11px; color: #94a3b8; line-height: 1.6; }
+  .ai-answer .verdict { font-weight: 700; margin-bottom: 4px; font-size: 12px; }
+  .ai-answer .verdict.pass { color: #22c55e; }
+  .ai-answer .verdict.fail { color: #f87171; }
+  .ai-answer .verdict.unclear { color: #fbbf24; }
+  .analyze-all-btn { width: 100%; padding: 8px; background: #1e1b4b; border: 1px solid #3730a3; color: #818cf8; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+  .analyze-all-btn:hover { background: #2e1b6b; }
+  .analyze-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
   .spinning { display: inline-block; animation: spin 1s linear infinite; }
@@ -288,7 +301,66 @@ const THEME_COLORS = {
 };
 
 // priceData: { current, prevClose, change1d, d1, d5, d10, candles[] }
-let priceData = {}, checklist = {}, expandedTicker = null, activeTier = "All", activeTheme = "All";
+let priceData = {}, checklist = {}, aiAnswers = {}, expandedTicker = null, activeTier = "All", activeTheme = "All";
+
+async function analyzeQuestion(ticker, idx, question, companyName) {
+  const key = ticker + '_' + idx;
+  aiAnswers[key] = 'loading';
+  renderStockList();
+
+  const prompt = `You are a senior equity analyst. A stock (${companyName}, ticker: ${ticker}) has recently dropped in price.
+Answer this specific due diligence question: "${question}"
+
+Respond in JSON only, no markdown, no explanation outside JSON:
+{
+  "verdict": "PASS" | "FAIL" | "UNCLEAR",
+  "summary": "2-3 sentence analysis based on recent news, earnings, and fundamentals. Be specific with numbers and dates where possible."
+}`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const data = await res.json();
+    // Extract text from response (may include tool use blocks)
+    const textBlock = data.content?.find(b => b.type === 'text');
+    if (!textBlock) throw new Error("No text block");
+    const raw = textBlock.text.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(raw);
+    aiAnswers[key] = parsed;
+    // Auto-check the box if PASS
+    if (parsed.verdict === 'PASS') {
+      if (!checklist[ticker]) checklist[ticker] = {};
+      checklist[ticker][idx] = true;
+    }
+  } catch(e) {
+    aiAnswers[key] = { verdict: 'UNCLEAR', summary: 'Analysis unavailable — please check manually.' };
+  }
+  renderStockList();
+}
+
+async function analyzeAll(ticker, companyName) {
+  const questions = [
+    "Is the core business model still intact?",
+    "Is the drop macro/sector-wide, not company-specific?",
+    "Are earnings/revenue still growing?",
+    "Is the competitive moat unchanged?",
+    "Any insider buying into the dip?",
+    "No new governance or legal issues?",
+    "Does my original thesis still hold?"
+  ];
+  for (let idx = 0; idx < questions.length; idx++) {
+    await analyzeQuestion(ticker, idx, questions[idx], companyName);
+    await new Promise(r => setTimeout(r, 500));
+  }
+}
 
 // Get unix timestamps for N trading days ago (approximate: 1 day = 86400s, skip weekends roughly)
 function tradingDaysAgo(n) {
@@ -574,12 +646,27 @@ function renderStockList() {
 
         const clHTML = checkItems.map((item,idx) => {
           const ck = checklist[s.ticker]?.[idx];
-          return `<div class="check-item" onclick="toggleCheck('${s.ticker}',${idx})">
-            <div class="check-box${ck?" checked":""}">${ck?"✓":""}</div>
-            <div>
-              <div class="check-q" style="color:${ck?"#475569":"#cbd5e1"}">${item[0]}</div>
-              <div class="check-hint">${item[1]}</div>
+          const aiKey = s.ticker + '_' + idx;
+          const aiData = aiAnswers[aiKey];
+          let aiHTML = '';
+          if (aiData === 'loading') {
+            aiHTML = `<div class="ai-answer"><span style="animation:pulse 1s infinite;display:inline-block">🤖 Analyzing with AI…</span></div>`;
+          } else if (aiData) {
+            const vcolor = aiData.verdict==='PASS'?'pass':aiData.verdict==='FAIL'?'fail':'unclear';
+            aiHTML = `<div class="ai-answer"><div class="verdict ${vcolor}">${aiData.verdict==='PASS'?'✅':aiData.verdict==='FAIL'?'❌':'⚠️'} ${aiData.verdict}</div>${aiData.summary}</div>`;
+          }
+          return `<div class="check-item" style="flex-direction:column;align-items:stretch;gap:4px">
+            <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleCheck('${s.ticker}',${idx})">
+              <div class="check-box${ck?" checked":""}">${ck?"✓":""}</div>
+              <div style="flex:1">
+                <div class="check-q" style="color:${ck?"#475569":"#cbd5e1"}">${item[0]}</div>
+                <div class="check-hint">${item[1]}</div>
+              </div>
+              <button class="ai-btn${aiData==='loading'?' loading':''}" onclick="event.stopPropagation();analyzeQuestion('${s.ticker}',${idx},'${item[0].replace(/'/g,"\'")}','${s.name}')" ${aiData==='loading'?'disabled':''}>
+                ${aiData && aiData!=='loading' ? '↻ Re-analyze' : '🤖 Analyze'}
+              </button>
             </div>
+            ${aiHTML}
           </div>`;
         }).join("");
 
@@ -595,6 +682,7 @@ function renderStockList() {
           </div>
           <div class="checklist-box">
             <div class="checklist-title">Fear vs. Fundamental Check</div>
+            <button class="analyze-all-btn" onclick="analyzeAll('${s.ticker}','${s.name}')">🤖 Auto-Analyze All 7 Questions for ${s.ticker}</button>
             ${clHTML}
             <div class="check-score" style="color:${sc}">${checks}/7 · ${sm}</div>
           </div>
