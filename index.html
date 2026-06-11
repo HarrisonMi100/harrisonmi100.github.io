@@ -671,7 +671,7 @@ function renderStockList() {
           const checkMark = ck ? '✓' : '';
           const qColor = ck ? '#475569' : '#cbd5e1';
           clHTML += '<div class="check-item" style="flex-direction:column;align-items:stretch;gap:4px">';
-          clHTML += '<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleCheck('' + s.ticker + '',' + idx + ')">';
+          clHTML += '<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleCheck(\'' + s.ticker + '\',' + idx + ')">';
           clHTML += '<div class="' + checkClass + '">' + checkMark + '</div>';
           clHTML += '<div style="flex:1"><div class="check-q" style="color:' + qColor + '">' + item[0] + '</div><div class="check-hint">' + item[1] + '</div></div>';
           clHTML += '<button class="' + btnClass + '" data-ticker="' + s.ticker + '" data-idx="' + idx + '" data-question="' + item[0].replace(/"/g,'&quot;') + '" data-name="' + s.name.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();analyzeQuestion(this.dataset.ticker,parseInt(this.dataset.idx),this.dataset.question,this.dataset.name)" ' + btnDisabled + '>' + btnLabel + '</button>';
