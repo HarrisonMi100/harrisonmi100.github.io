@@ -121,6 +121,49 @@
   .analyze-all-btn { width: 100%; padding: 8px; background: #1e1b4b; border: 1px solid #3730a3; color: #818cf8; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
   .analyze-all-btn:hover { background: #2e1b6b; }
   .analyze-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  /* Sidebar */
+  .layout { display:flex; height:100vh; overflow:hidden; }
+  .main-pane { flex:1; overflow-y:auto; min-width:0; }
+  .sidebar { width:380px; flex-shrink:0; background:#0f172a; border-left:1px solid #1e293b; display:flex; flex-direction:column; transition:width 0.2s; }
+  .sidebar.collapsed { width:0; overflow:hidden; border:none; }
+  .sb-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #1e293b; flex-shrink:0; }
+  .sb-title { font-size:13px; font-weight:600; color:#e2e8f0; }
+  .sb-close { background:none; border:none; color:#64748b; cursor:pointer; font-size:16px; padding:0; }
+  .sb-close:hover { color:#e2e8f0; }
+  .sb-body { flex:1; overflow-y:auto; padding:16px; }
+  .sb-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#475569; text-align:center; gap:8px; }
+  .sb-empty-icon { font-size:32px; }
+  .sb-empty-text { font-size:13px; line-height:1.6; }
+  .sb-ticker { font-size:11px; color:#818cf8; font-weight:600; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
+  .sb-question { font-size:14px; font-weight:600; color:#e2e8f0; margin-bottom:16px; line-height:1.5; }
+  .sb-loading { display:flex; flex-direction:column; gap:10px; }
+  .sb-loading-bar { height:10px; background:#1e293b; border-radius:5px; overflow:hidden; }
+  .sb-loading-fill { height:100%; background:linear-gradient(90deg,#3730a3,#818cf8,#3730a3); background-size:200%; animation:shimmer 1.5s infinite; border-radius:5px; }
+  @keyframes shimmer { 0%{background-position:200%} 100%{background-position:-200%} }
+  .sb-loading-text { font-size:12px; color:#64748b; animation:pulse 1.5s infinite; }
+  .sb-verdict { display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; margin-bottom:14px; }
+  .sb-verdict.pass { background:#052e16; border:1px solid #166534; }
+  .sb-verdict.fail { background:#1c0808; border:1px solid #7f1d1d; }
+  .sb-verdict.unclear { background:#1c1408; border:1px solid #78350f; }
+  .sb-verdict-icon { font-size:20px; }
+  .sb-verdict-label { font-size:15px; font-weight:700; }
+  .sb-verdict-label.pass { color:#22c55e; }
+  .sb-verdict-label.fail { color:#f87171; }
+  .sb-verdict-label.unclear { color:#fbbf24; }
+  .sb-summary { font-size:13px; color:#cbd5e1; line-height:1.7; margin-bottom:16px; }
+  .sb-divider { height:1px; background:#1e293b; margin:14px 0; }
+  .sb-section-title { font-size:10px; color:#475569; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; }
+  .sb-all-item { padding:10px 12px; background:#0a0f1a; border-radius:8px; margin-bottom:8px; border:1px solid #1e293b; }
+  .sb-all-q { font-size:12px; color:#94a3b8; margin-bottom:6px; }
+  .sb-all-verdict { font-size:12px; font-weight:600; }
+  .sb-all-verdict.pass { color:#22c55e; }
+  .sb-all-verdict.fail { color:#f87171; }
+  .sb-all-verdict.unclear { color:#fbbf24; }
+  .sb-all-summary { font-size:11px; color:#64748b; margin-top:4px; line-height:1.5; }
+  .sb-score { text-align:center; padding:14px; background:#0a0f1a; border-radius:8px; margin-top:10px; border:1px solid #1e293b; }
+  .sb-score-num { font-size:28px; font-weight:700; }
+  .sb-score-label { font-size:12px; color:#64748b; margin-top:4px; }
+  .sb-toggle { position:fixed; right:0; top:50%; transform:translateY(-50%); background:#1e1b4b; border:1px solid #3730a3; border-right:none; color:#818cf8; padding:12px 6px; cursor:pointer; border-radius:6px 0 0 6px; font-size:12px; writing-mode:vertical-rl; z-index:100; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
   .spinning { display: inline-block; animation: spin 1s linear infinite; }
@@ -133,6 +176,9 @@
 <div id="cors-warning" style="display:none;background:#7f1d1d;border-bottom:1px solid #dc2626;padding:10px 20px;font-size:12px;color:#fca5a5;text-align:center">
   ⚠️ <strong>5D/10D data requires GitHub Pages.</strong> Open via <strong>harrisonmi100.github.io</strong> — not from a local file. The 1D column will still work here.
 </div>
+<button class="sb-toggle" id="sb-toggle" onclick="toggleSidebar()">AI Analysis</button>
+<div class="layout">
+<div class="main-pane">
 <div class="header">
   <div class="header-inner">
     <div class="header-top">
@@ -399,7 +445,16 @@ async function analyzeAll(ticker) {
   const stock = WATCHLIST.find(s => s.ticker === ticker);
   const companyName = stock ? stock.name : ticker;
   const btn = document.getElementById('analyze-btn-' + ticker);
-  if (btn) { btn.disabled = true; btn.textContent = '🤖 Analyzing...'; }
+  if (btn) { btn.disabled = true; btn.textContent = '🤖 Analyzing 1/7...'; }
+
+  // Show sidebar loading state
+  const sb = document.getElementById('sidebar');
+  sb.classList.remove('collapsed');
+  document.getElementById('sb-content').innerHTML =
+    '<div class="sb-ticker">' + ticker + ' — Full Due Diligence</div>' +
+    '<div class="sb-loading"><div class="sb-loading-bar"><div class="sb-loading-fill"></div></div>' +
+    '<div class="sb-loading-text">Analyzing all 7 questions with web search...</div></div>';
+
   const questions = [
     "Is the core business model still intact?",
     "Is the drop macro/sector-wide, not company-specific?",
@@ -409,12 +464,15 @@ async function analyzeAll(ticker) {
     "No new governance or legal issues?",
     "Does my original thesis still hold?"
   ];
+  const results = [];
   for (let idx = 0; idx < questions.length; idx++) {
-    if (btn) btn.textContent = `🤖 Analyzing question ${idx+1}/7...`;
+    if (btn) btn.textContent = '🤖 Question ' + (idx+1) + '/7...';
     await analyzeQuestion(ticker, idx, questions[idx], companyName);
-    await new Promise(r => setTimeout(r, 500));
+    results.push(aiAnswers[ticker + '_' + idx]);
+    await new Promise(r => setTimeout(r, 300));
   }
-  if (btn) { btn.disabled = false; btn.textContent = `✅ Analysis Complete — Re-run?`; }
+  showSidebarAllResults(ticker, results);
+  if (btn) { btn.disabled = false; btn.textContent = '✅ Done — Re-run?'; }
 }
 
 // Get unix timestamps for N trading days ago (approximate: 1 day = 86400s, skip weekends roughly)
@@ -777,6 +835,87 @@ if (window.location.protocol === 'file:') {
 }
 renderAll();
 fetchAllPrices();
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('collapsed');
+}
+
+function showSidebarLoading(ticker, question) {
+  const sb = document.getElementById('sidebar');
+  sb.classList.remove('collapsed');
+  document.getElementById('sb-content').innerHTML =
+    '<div class="sb-ticker">' + ticker + '</div>' +
+    '<div class="sb-question">' + question + '</div>' +
+    '<div class="sb-loading">' +
+    '<div class="sb-loading-bar"><div class="sb-loading-fill"></div></div>' +
+    '<div class="sb-loading-text">Searching for latest earnings, news, and filings...</div>' +
+    '<div class="sb-loading-bar" style="width:70%"><div class="sb-loading-fill"></div></div>' +
+    '<div class="sb-loading-bar" style="width:40%"><div class="sb-loading-fill"></div></div>' +
+    '</div>';
+}
+
+function showSidebarResult(ticker, question, result) {
+  const vc = result.verdict === 'PASS' ? 'pass' : result.verdict === 'FAIL' ? 'fail' : 'unclear';
+  const icon = result.verdict === 'PASS' ? '✅' : result.verdict === 'FAIL' ? '❌' : '⚠️';
+  document.getElementById('sb-content').innerHTML =
+    '<div class="sb-ticker">' + ticker + '</div>' +
+    '<div class="sb-question">' + question + '</div>' +
+    '<div class="sb-verdict ' + vc + '">' +
+    '<span class="sb-verdict-icon">' + icon + '</span>' +
+    '<span class="sb-verdict-label ' + vc + '">' + result.verdict + '</span>' +
+    '</div>' +
+    '<div class="sb-summary">' + (result.summary || '') + '</div>';
+}
+
+function showSidebarAllResults(ticker, results) {
+  const questions = [
+    "Is the core business model still intact?",
+    "Is the drop macro/sector-wide, not company-specific?",
+    "Are earnings/revenue still growing?",
+    "Is the competitive moat unchanged?",
+    "Any insider buying into the dip?",
+    "No new governance or legal issues?",
+    "Does my original thesis still hold?"
+  ];
+  const passes = results.filter(r => r && r.verdict === 'PASS').length;
+  const scoreColor = passes >= 6 ? '#22c55e' : passes >= 4 ? '#fbbf24' : '#f87171';
+  const scoreMsg = passes >= 6 ? 'Strong buy signal' : passes >= 4 ? 'Proceed with caution' : 'Do not buy';
+
+  let html = '<div class="sb-ticker">' + ticker + ' — Full Due Diligence</div>';
+  html += '<div class="sb-score"><div class="sb-score-num" style="color:' + scoreColor + '">' + passes + '/7</div><div class="sb-score-label">' + scoreMsg + '</div></div>';
+  html += '<div class="sb-divider"></div>';
+  html += '<div class="sb-section-title">Question by question breakdown</div>';
+
+  results.forEach(function(r, idx) {
+    if (!r) return;
+    const vc = r.verdict === 'PASS' ? 'pass' : r.verdict === 'FAIL' ? 'fail' : 'unclear';
+    const icon = r.verdict === 'PASS' ? '✅' : r.verdict === 'FAIL' ? '❌' : '⚠️';
+    html += '<div class="sb-all-item">' +
+      '<div class="sb-all-q">' + (idx+1) + '. ' + questions[idx] + '</div>' +
+      '<div class="sb-all-verdict ' + vc + '">' + icon + ' ' + r.verdict + '</div>' +
+      '<div class="sb-all-summary">' + (r.summary || '') + '</div>' +
+      '</div>';
+  });
+
+  document.getElementById('sb-content').innerHTML = html;
+}
 </script>
+</div><!-- end main-pane -->
+
+<div class="sidebar" id="sidebar">
+  <div class="sb-header">
+    <span class="sb-title">AI Due Diligence</span>
+    <button class="sb-close" onclick="toggleSidebar()">✕</button>
+  </div>
+  <div class="sb-body" id="sb-content">
+    <div class="sb-empty">
+      <div class="sb-empty-icon">🤖</div>
+      <div class="sb-empty-text">Expand any stock and click<br><strong>Analyze</strong> or <strong>Auto-Analyze All 7</strong><br>to see AI due diligence here.</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end layout -->
 </body>
 </html>
