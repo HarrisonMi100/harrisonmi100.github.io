@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>⚡ Dip Buyer Watchlist</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #080c14; color: #e2e8f0; font-family: -apple-system, 'Inter', sans-serif; font-size: 14px; }
+  .header { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); border-bottom: 1px solid #1e293b; padding: 20px 20px 0; }
+  .header-inner { max-width: 900px; margin: 0 auto; }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .brand { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #818cf8; font-weight: 600; margin-bottom: 4px; }
+  h1 { font-size: 22px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.5px; }
+  .refresh-btn { background: #1e1b4b; border: 1px solid #3730a3; color: #818cf8; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .refresh-btn:hover { background: #2e1b6b; }
+  .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .progress-wrap { margin-top: 6px; }
+  .progress-label { font-size: 11px; color: #818cf8; margin-bottom: 4px; }
+  .progress-bar { width: 160px; height: 4px; background: #1e293b; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #818cf8, #22c55e); border-radius: 2px; transition: width 0.3s; }
+  .alert-badge { font-size: 11px; padding: 2px 10px; border-radius: 10px; display: inline-block; margin-right: 6px; }
+  .tabs { display: flex; margin-top: 14px; }
+  .tab { background: transparent; border: none; border-bottom: 2px solid transparent; color: #64748b; padding: 8px 18px; cursor: pointer; font-size: 13px; font-weight: 500; }
+  .tab.active { border-bottom-color: #818cf8; color: #e2e8f0; }
+  .content { max-width: 900px; margin: 0 auto; padding: 20px; }
+  .filters { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
+  .filter-label { font-size: 10px; color: #64748b; margin-bottom: 5px; letter-spacing: 1px; text-transform: uppercase; }
+  .tier-btns { display: flex; gap: 5px; }
+  .tier-btn { padding: 4px 11px; border-radius: 6px; border: 1px solid #1e293b; background: #0f172a; color: #64748b; cursor: pointer; font-size: 12px; }
+  .tier-btn.active { border-color: #818cf8; background: #1e1b4b; color: #818cf8; }
+  select { background: #0f172a; border: 1px solid #1e293b; color: #e2e8f0; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .tier-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 24px; }
+  .tier-card { border-radius: 10px; padding: 10px 12px; cursor: pointer; border: 1px solid #1e293b; background: #0f172a; }
+  .tier-card-label { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .tier-card-count { font-size: 11px; color: #64748b; }
+  .tier-card-alert { font-size: 10px; margin-top: 3px; }
+  .tier-card-trigger { font-size: 10px; margin-top: 2px; }
+  .tier-section { margin-bottom: 24px; }
+  .tier-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .tier-bar { width: 3px; height: 18px; border-radius: 2px; }
+  .tier-heading-label { font-size: 12px; font-weight: 600; }
+  .tier-heading-sub { font-size: 11px; color: #334155; }
+  .stock-card { border-radius: 10px; overflow: hidden; margin-bottom: 6px; border: 1px solid #1e293b; background: #0f172a; }
+  .stock-row { display: flex; align-items: center; padding: 11px 14px; cursor: pointer; gap: 10px; }
+  .stock-ticker { width: 58px; flex-shrink: 0; }
+  .ticker-text { font-size: 13px; font-weight: 700; }
+  .alert-tag { font-size: 9px; margin-top: 1px; }
+  .stock-info { flex: 1; min-width: 0; }
+  .stock-name { font-size: 12px; font-weight: 500; color: #e2e8f0; }
+  .theme-badge { font-size: 10px; background: #1e293b; padding: 1px 6px; border-radius: 8px; display: inline-block; margin-top: 3px; }
+  .stock-price { text-align: right; min-width: 75px; }
+  .price-val { font-size: 14px; font-weight: 700; color: #f1f5f9; }
+  .price-change { font-size: 11px; }
+  /* Speed columns */
+  .stock-speed { text-align: right; min-width: 60px; }
+  .speed-val { font-size: 12px; font-weight: 700; }
+  .speed-label { font-size: 9px; color: #475569; }
+  .stock-dip { text-align: right; min-width: 60px; }
+  .dip-val { font-size: 13px; font-weight: 700; }
+  .dip-label { font-size: 9px; color: #475569; }
+  .check-badge { font-size: 10px; color: #22c55e; background: #052e16; padding: 2px 6px; border-radius: 8px; border: 1px solid #166534; }
+  .chevron { color: #334155; font-size: 11px; margin-left: 2px; }
+  .loading-pulse { color: #334155; font-size: 11px; animation: pulse 1.5s infinite; }
+  .stock-detail { padding: 0 14px 14px; border-top: 1px solid var(--tier-border, #1e293b); }
+
+  /* Speed indicator panel */
+  .speed-panel { background: #0a0f1a; border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+  .speed-panel-title { font-size: 10px; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .speed-bars { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .speed-bar-item { text-align: center; }
+  .speed-bar-label { font-size: 10px; color: #64748b; margin-bottom: 4px; }
+  .speed-bar-val { font-size: 13px; font-weight: 700; }
+  .speed-bar-sub { font-size: 10px; color: #475569; margin-top: 2px; }
+  .speed-signal { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px; text-align: center; }
+
+  .price-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; margin: 12px 0; }
+  .price-cell { background: #0a0f1a; border-radius: 8px; padding: 8px; text-align: center; }
+  .price-cell-label { font-size: 10px; color: #64748b; margin-bottom: 3px; }
+  .price-cell-val { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+  .dip-banner { background: #0a0f1a; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .info-cell { background: #0a0f1a; border-radius: 8px; padding: 10px 12px; }
+  .info-cell-label { font-size: 10px; color: #64748b; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+  .info-cell-val { font-size: 12px; color: #cbd5e1; line-height: 1.5; }
+  .checklist-box { background: #0a0f1a; border-radius: 8px; padding: 10px 12px; }
+  .checklist-title { font-size: 10px; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .check-item { display: flex; gap: 8px; padding: 5px 0; cursor: pointer; align-items: flex-start; border-bottom: 1px solid #0f172a; }
+  .check-item:last-of-type { border-bottom: none; }
+  .check-box { width: 15px; height: 15px; border-radius: 4px; border: 1px solid #334155; background: transparent; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; font-size: 9px; }
+  .check-box.checked { border-color: #22c55e; background: #14532d; color: #22c55e; }
+  .check-q { font-size: 12px; color: #cbd5e1; }
+  .check-hint { font-size: 10px; color: #334155; margin-top: 1px; }
+  .check-score { margin-top: 8px; font-size: 11px; }
+  .framework-card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .framework-title { font-size: 15px; font-weight: 600; color: #e2e8f0; margin-bottom: 6px; }
+  .framework-sub { font-size: 12px; color: #64748b; line-height: 1.6; margin-bottom: 16px; }
+  .fw-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1e293b; align-items: flex-start; }
+  .fw-item:last-child { border-bottom: none; }
+  .fw-num { width: 22px; height: 22px; border-radius: 6px; background: #1e293b; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #818cf8; font-weight: 700; flex-shrink: 0; }
+  .fw-q { font-size: 13px; color: #e2e8f0; font-weight: 500; }
+  .fw-hint { font-size: 11px; color: #475569; margin-top: 2px; }
+  .tier-guide-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #1e293b; align-items: flex-start; }
+  .tier-guide-row:last-child { border-bottom: none; }
+  .tier-trigger { width: 56px; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .speed-guide { background: #0a0f1a; border-radius: 10px; padding: 14px; margin-top: 10px; }
+  .speed-guide-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #0f172a; align-items: flex-start; }
+  .speed-guide-row:last-child { border-bottom: none; }
+  .speed-icon { width: 22px; flex-shrink: 0; font-size: 13px; }
+  .disclaimer { padding: 12px; background: #0c1a0c; border: 1px solid #166534; border-radius: 10px; font-size: 11px; color: #86efac; line-height: 1.6; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  .spinning { display: inline-block; animation: spin 1s linear infinite; }
+  .hidden { display: none !important; }
+  .col-header { display: flex; align-items: center; padding: 0 14px 6px; gap: 10px; }
+  .col-h { font-size: 10px; color: #334155; text-transform: uppercase; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="cors-warning" style="display:none;background:#7f1d1d;border-bottom:1px solid #dc2626;padding:10px 20px;font-size:12px;color:#fca5a5;text-align:center">
+  ⚠️ <strong>5D/10D data requires GitHub Pages.</strong> Open via <strong>harrisonmi100.github.io</strong> — not from a local file. The 1D column will still work here.
+</div>
+<div class="header">
+  <div class="header-inner">
+    <div class="header-top">
+      <div>
+        <div class="brand">⚡ Dip Buyer</div>
+        <h1>Conviction Watchlist</h1>
+        <div style="font-size:12px;color:#475569;margin-top:4px">24 names · Speed-based dip detection · Live via Finnhub</div>
+      </div>
+      <div style="text-align:right">
+        <div id="progress-wrap" class="progress-wrap hidden">
+          <div class="progress-label" id="progress-label">Fetching prices… 0%</div>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+        </div>
+        <div id="refresh-wrap">
+          <div style="font-size:11px;color:#475569;margin-bottom:4px" id="last-updated"></div>
+          <button class="refresh-btn" id="refresh-btn" onclick="fetchAllPrices()">⟳ Refresh Prices</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px" id="alert-bar"></div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('watchlist',this)">📋 Watchlist</button>
+      <button class="tab" onclick="switchTab('checklist',this)">✅ Framework</button>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+  <div id="tab-watchlist">
+    <div class="filters">
+      <div>
+        <div class="filter-label">Tier</div>
+        <div class="tier-btns">
+          <button class="tier-btn active" onclick="filterTier('All',this)">All</button>
+          <button class="tier-btn" onclick="filterTier(1,this)">🟢</button>
+          <button class="tier-btn" onclick="filterTier(2,this)">🔵</button>
+          <button class="tier-btn" onclick="filterTier(3,this)">🟡</button>
+          <button class="tier-btn" onclick="filterTier(4,this)">🔴</button>
+        </div>
+      </div>
+      <div>
+        <div class="filter-label">Theme</div>
+        <select onchange="filterTheme(this.value)">
+          <option>All</option>
+          <option>AI Infrastructure</option>
+          <option>AI Infra + Quantum</option>
+          <option>Defense</option>
+          <option>Defense/Drone</option>
+          <option>Defense/AI</option>
+          <option>Biotech</option>
+          <option>Biotech/AI</option>
+          <option>Quantum</option>
+          <option>Quantum (Anchor)</option>
+        </select>
+      </div>
+    </div>
+    <div class="tier-cards" id="tier-cards"></div>
+    <!-- Column headers -->
+    <div class="col-header">
+      <div style="width:58px"></div>
+      <div style="flex:1"></div>
+      <div class="col-h" style="min-width:75px;text-align:right">Price</div>
+      <div class="col-h" style="min-width:60px;text-align:right">1D Drop</div>
+      <div class="col-h" style="min-width:60px;text-align:right">5D Drop</div>
+      <div class="col-h" style="min-width:60px;text-align:right">10D Drop</div>
+      <div style="width:40px"></div>
+    </div>
+    <div id="stock-list"></div>
+  </div>
+
+  <div id="tab-checklist" class="hidden">
+    <div class="framework-card">
+      <div class="framework-title">Fear vs. Fundamental Framework</div>
+      <div class="framework-sub">When a stock hits your alert threshold, run through this before deploying capital. 6+ checks = strong fear-driven signal. Below 4 = likely fundamental — don't buy.</div>
+      <div class="fw-item"><div class="fw-num">1</div><div><div class="fw-q">Is the core business model still intact?</div><div class="fw-hint">Earnings/revenue trend still positive?</div></div></div>
+      <div class="fw-item"><div class="fw-num">2</div><div><div class="fw-q">Is the drop macro/sector-wide, not company-specific?</div><div class="fw-hint">Whole sector sold off, not just this name?</div></div></div>
+      <div class="fw-item"><div class="fw-num">3</div><div><div class="fw-q">Are earnings/revenue still growing?</div><div class="fw-hint">Is the most recent quarter still showing growth?</div></div></div>
+      <div class="fw-item"><div class="fw-num">4</div><div><div class="fw-q">Is the competitive moat unchanged?</div><div class="fw-hint">Pricing power, switching costs, or network effects intact?</div></div></div>
+      <div class="fw-item"><div class="fw-num">5</div><div><div class="fw-q">Any insider buying into the dip?</div><div class="fw-hint">Check SEC filings for Form 4s in last 30 days.</div></div></div>
+      <div class="fw-item"><div class="fw-num">6</div><div><div class="fw-q">No new governance or legal issues?</div><div class="fw-hint">No new DOJ, SEC, accounting, or auditor issues?</div></div></div>
+      <div class="fw-item"><div class="fw-num">7</div><div><div class="fw-q">Does my original thesis still hold?</div><div class="fw-hint">The reason you'd own this stock — is it unchanged?</div></div></div>
+    </div>
+
+    <div class="framework-card">
+      <div class="framework-title">⚡ Speed-Based Dip Signal Guide</div>
+      <div class="framework-sub">The faster the drop, the more likely it's fear-driven. A slow bleed over months = institutional exit, not a dip.</div>
+      <div class="speed-guide">
+        <div class="speed-guide-row">
+          <div class="speed-icon">🟢</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#22c55e">High Conviction — 1–10 trading days</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px">Sharp drop on identifiable catalyst. Volume spike 2–3x normal. Buy zone — run checklist and act.</div>
+          </div>
+        </div>
+        <div class="speed-guide-row">
+          <div class="speed-icon">🟡</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#fbbf24">Caution — 2–6 weeks</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px">Could be fear, could be repricing. Wait for stabilization. Run full checklist. Don't chase.</div>
+          </div>
+        </div>
+        <div class="speed-guide-row">
+          <div class="speed-icon">🔴</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#f87171">Likely Not a Dip — 2+ months</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px">Slow bleeds = institutional exit. Market has had time to digest. Avoid — this is how SMCI looked before collapse.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="framework-card">
+      <div class="framework-title">Tier Alert Thresholds</div>
+      <div class="tier-guide-row"><div class="tier-trigger" style="color:#22c55e">−15%</div><div><div style="font-size:12px;font-weight:600;color:#22c55e">Tier 1 — Core</div><div style="font-size:11px;color:#64748b;margin-top:1px">Buy aggressively on dips. Anchors of the portfolio.</div></div></div>
+      <div class="tier-guide-row"><div class="tier-trigger" style="color:#60a5fa">−20–25%</div><div><div style="font-size:12px;font-weight:600;color:#60a5fa">Tier 2 — Growth</div><div style="font-size:11px;color:#64748b;margin-top:1px">Confirm thesis intact before deploying.</div></div></div>
+      <div class="tier-guide-row"><div class="tier-trigger" style="color:#fbbf24">−25–35%</div><div><div style="font-size:12px;font-weight:600;color:#fbbf24">Tier 3 — High Growth</div><div style="font-size:11px;color:#64748b;margin-top:1px">Smaller size. Thesis must be clearly intact.</div></div></div>
+      <div class="tier-guide-row"><div class="tier-trigger" style="color:#f87171">−35%+</div><div><div style="font-size:12px;font-weight:600;color:#f87171">Tier 4 — Speculative</div><div style="font-size:11px;color:#64748b;margin-top:1px">Small sleeve only. Binary outcomes possible.</div></div></div>
+    </div>
+
+    <div class="disclaimer">⚠️ Research tool only — not financial advice. Consult a fee-only fiduciary at NAPFA.org or XYPlanningNetwork.com for retirement account decisions.</div>
+  </div>
+</div>
+
+<script>
+const FINNHUB_KEY = "d8kr5r9r01qut1f776agd8kr5r9r01qut1f776b0";
+
+const WATCHLIST = [
+  {ticker:"NVDA",name:"Nvidia",theme:"AI Infrastructure",tier:1,moat:"Dominant GPU ecosystem; CUDA lock-in",keyRisk:"Valuation; capex cycle reset"},
+  {ticker:"MSFT",name:"Microsoft",theme:"AI Infra + Quantum",tier:1,moat:"Azure + Copilot + OpenAI; enterprise switching costs",keyRisk:"Regulatory; market saturation"},
+  {ticker:"GOOGL",name:"Alphabet",theme:"AI Infra + Quantum",tier:1,moat:"Search monopoly + GCP; 11 consecutive double-digit growth quarters",keyRisk:"Antitrust overhang"},
+  {ticker:"AVGO",name:"Broadcom",theme:"AI Infrastructure",tier:1,moat:"Custom AI silicon + networking; sticky hyperscaler contracts",keyRisk:"Customer concentration"},
+  {ticker:"VRTX",name:"Vertex Pharma",theme:"Biotech",tier:1,moat:"Dominant CF franchise; expanding into pain & kidney disease",keyRisk:"Pipeline binary events"},
+  {ticker:"NOC",name:"Northrop Grumman",theme:"Defense",tier:1,moat:"Large-cap defense; RQ-4 Global Hawk; diversified contracts",keyRisk:"Defense budget uncertainty"},
+  {ticker:"RTX",name:"Raytheon Technologies",theme:"Defense",tier:1,moat:"Counter-UAS fastest-growing segment",keyRisk:"Cost overruns; political risk"},
+  {ticker:"ANET",name:"Arista Networks",theme:"AI Infrastructure",tier:2,moat:"AI networking backbone; strong balance sheet; EPS growth",keyRisk:"Hyperscaler capex slowdown"},
+  {ticker:"ORCL",name:"Oracle",theme:"AI Infrastructure",tier:2,moat:"$130B+ cloud backlog; capacity booked over a year ahead",keyRisk:"Execution on cloud transition"},
+  {ticker:"VRT",name:"Vertiv",theme:"AI Infrastructure",tier:2,moat:"Thermal mgmt & rack systems; S&P 500 inclusion",keyRisk:"Supply chain; margin pressure"},
+  {ticker:"AVAV",name:"AeroVironment",theme:"Defense/Drone",tier:2,moat:"Switchblade loitering munitions; $1.1B funded backlog",keyRisk:"Accounting write-down noise"},
+  {ticker:"LHX",name:"L3Harris",theme:"Defense",tier:2,moat:"Tactical radios + EW systems; record $40.7B backlog",keyRisk:"Integration risk from prior mergers"},
+  {ticker:"ARGX",name:"Argenx",theme:"Biotech",tier:2,moat:"FDA label expansions May 2026; Vyvgart pipeline underappreciated",keyRisk:"Label expansion execution"},
+  {ticker:"NBIX",name:"Neurocrine Biosciences",theme:"Biotech",tier:2,moat:"Ingrezza growing steadily; clean balance sheet; consistent FCF",keyRisk:"Patent cliff risk"},
+  {ticker:"HALO",name:"Halozyme",theme:"Biotech",tier:2,moat:"Enhanze drug-delivery platform licensed to major pharma",keyRisk:"Partner dependency"},
+  {ticker:"IBM",name:"IBM",theme:"Quantum (Anchor)",tier:2,moat:"Only major tech co with decades of quantum research + profitable core",keyRisk:"Slow-moving; legacy business drag"},
+  {ticker:"KTOS",name:"Kratos Defense",theme:"Defense/Drone",tier:3,moat:"Valkyrie attritable drone; USAF procurement potential",keyRisk:"Negative FCF during production ramp"},
+  {ticker:"PLTR",name:"Palantir",theme:"Defense/AI",tier:3,moat:"Government AI software moat; AIP commercial traction",keyRisk:"Very high valuation"},
+  {ticker:"SDGR",name:"Schrödinger",theme:"Biotech/AI",tier:3,moat:"$256M 2025 revenue; ACV growing 10-15%; path to EBITDA 2028",keyRisk:"Long runway to profitability"},
+  {ticker:"CYTK",name:"Cytokinetics",theme:"Biotech",tier:3,moat:"FDA-approved MYQORZO Dec 2025; Q4 beat by 121%",keyRisk:"Commercial ramp uncertainty"},
+  {ticker:"RXRX",name:"Recursion",theme:"Biotech/AI",tier:3,moat:"AI drug discovery; $750M cash; Q4 2025 revenue beat 44%",keyRisk:"Pre-profitability; dilution risk"},
+  {ticker:"IONQ",name:"IonQ",theme:"Quantum",tier:3,moat:"Q1 2026 revenue +755% YoY; $3B+ cash; trapped-ion leadership",keyRisk:"Unprofitable; burns $80M/quarter"},
+  {ticker:"RGTI",name:"Rigetti Computing",theme:"Quantum",tier:4,moat:"Modular superconducting; AWS + Azure cloud access",keyRisk:"18% single-day drops; high dilution risk"},
+  {ticker:"QBTS",name:"D-Wave",theme:"Quantum",tier:4,moat:"Quantum annealing; commercial clients (Volkswagen, etc.)",keyRisk:"Narrow use-case architecture"},
+];
+
+const TIER_CONFIG = {
+  1:{label:"Tier 1 — Core",color:"#22c55e",bg:"rgba(5,46,22,0.9)",border:"#16a34a",dipTrigger:"−15%",tagline:"Buy aggressively on dips.",dot:"🟢",threshold:-15},
+  2:{label:"Tier 2 — Growth",color:"#60a5fa",bg:"rgba(12,26,46,0.9)",border:"#2563eb",dipTrigger:"−20–25%",tagline:"Confirm thesis before deploying.",dot:"🔵",threshold:-20},
+  3:{label:"Tier 3 — High Growth",color:"#fbbf24",bg:"rgba(28,20,8,0.9)",border:"#d97706",dipTrigger:"−25–35%",tagline:"Smaller size. Thesis must hold.",dot:"🟡",threshold:-25},
+  4:{label:"Tier 4 — Speculative",color:"#f87171",bg:"rgba(28,8,8,0.9)",border:"#dc2626",dipTrigger:"−35%+",tagline:"Small sleeve. Binary outcomes.",dot:"🔴",threshold:-35},
+};
+
+const THEME_COLORS = {
+  "AI Infrastructure":"#818cf8","AI Infra + Quantum":"#a78bfa","Defense":"#34d399",
+  "Defense/Drone":"#6ee7b7","Defense/AI":"#5eead4","Biotech":"#f472b6",
+  "Biotech/AI":"#e879f9","Quantum":"#38bdf8","Quantum (Anchor)":"#7dd3fc"
+};
+
+// priceData: { current, prevClose, change1d, d1, d5, d10, candles[] }
+let priceData = {}, checklist = {}, expandedTicker = null, activeTier = "All", activeTheme = "All";
+
+// Get unix timestamps for N trading days ago (approximate: 1 day = 86400s, skip weekends roughly)
+function tradingDaysAgo(n) {
+  // Add ~40% buffer to account for weekends/holidays
+  const seconds = Math.ceil(n * 1.4) * 86400;
+  return Math.floor(Date.now()/1000) - seconds;
+}
+
+async function fetchCandles(ticker) {
+  // Yahoo Finance - works when served from a real domain (GitHub Pages)
+  // Will fail from file:// due to browser CORS policy - must be on GitHub Pages
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=20d&corsDomain=finance.yahoo.com`;
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
+      },
+      mode: 'cors'
+    });
+    const data = await res.json();
+    const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+    if (!closes || closes.length < 2) return null;
+    const clean = closes.filter(v => v !== null && v !== undefined && v > 0);
+    if (clean.length < 5) return null;
+    return { c: clean };
+  } catch(e) {
+    return null;
+  }
+}
+
+async function fetchQuote(ticker) {
+  const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`);
+  return res.json();
+}
+
+function calcDrop(currentPrice, candles, daysBack) {
+  if (!candles || !candles.c || !currentPrice) return null;
+  const closes = candles.c;
+  const n = closes.length;
+  if (n < daysBack + 1) return null;
+  // n-1 = most recent close, n-1-daysBack = daysBack trading days ago
+  const idx = n - 1 - daysBack;
+  if (idx < 0) return null;
+  const past = closes[idx];
+  if (!past || past === 0) return null;
+  return ((currentPrice - past) / past * 100);
+}
+
+function getSpeedSignal(d1, d5, d10, tier) {
+  const threshold = TIER_CONFIG[tier].threshold;
+  // Check if any window hits the threshold
+  const hit1 = d1 !== null && d1 <= threshold;
+  const hit5 = d5 !== null && d5 <= threshold;
+  const hit10 = d10 !== null && d10 <= threshold;
+
+  if (hit1) return { signal: "🟢 HIGH CONVICTION", color: "#22c55e", bg: "#052e16", msg: "Drop within 1 day — strong fear signal. Run checklist now." };
+  if (hit5) return { signal: "🟢 HIGH CONVICTION", color: "#22c55e", bg: "#052e16", msg: "Drop within 5 trading days — fast fear-driven selloff. Check thesis." };
+  if (hit10) return { signal: "🟡 WATCH", color: "#fbbf24", bg: "#1c1408", msg: "Drop within 10 trading days — within buy window but verify catalyst." };
+  return null;
+}
+
+async function fetchAllPrices() {
+  const btn = document.getElementById("refresh-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinning">⟳</span> Fetching...';
+  document.getElementById("progress-wrap").classList.remove("hidden");
+  document.getElementById("refresh-wrap").classList.add("hidden");
+
+  for (let i = 0; i < WATCHLIST.length; i++) {
+    const s = WATCHLIST[i];
+    const pct = Math.round(((i+1)/WATCHLIST.length)*100);
+    document.getElementById("progress-label").textContent = `Fetching ${s.ticker}… ${pct}%`;
+    document.getElementById("progress-fill").style.width = pct + "%";
+
+    try {
+      const [quote, candles] = await Promise.all([
+        fetchQuote(s.ticker),
+        fetchCandles(s.ticker)
+      ]);
+
+      const currentPrice = quote.c;
+      // 1D: use quote directly for accuracy
+      const d1 = (quote.c && quote.pc && quote.pc !== 0) ? ((quote.c - quote.pc)/quote.pc*100) : null;
+      const d5 = calcDrop(currentPrice, candles, 5);
+      const d10 = calcDrop(currentPrice, candles, 10);
+
+      priceData[s.ticker] = {
+        current: quote.c || null,
+        prevClose: quote.pc || null,
+        change1d: (quote.c && quote.pc) ? ((quote.c - quote.pc)/quote.pc*100) : null,
+        d1, d5, d10,
+        candles,
+      };
+    } catch(e) {
+      priceData[s.ticker] = { error: true };
+    }
+    await new Promise(r => setTimeout(r, 200));
+    renderAll();
+  }
+
+  document.getElementById("progress-wrap").classList.add("hidden");
+  document.getElementById("refresh-wrap").classList.remove("hidden");
+  document.getElementById("last-updated").textContent = "Updated " + new Date().toLocaleTimeString();
+  btn.disabled = false;
+  btn.innerHTML = "⟳ Refresh Prices";
+}
+
+function getDipColor(pct) {
+  if (pct === null) return "#6b7280";
+  if (pct <= -35) return "#f87171";
+  if (pct <= -25) return "#fbbf24";
+  if (pct <= -15) return "#60a5fa";
+  if (pct < 0) return "#94a3b8";
+  return "#22c55e";
+}
+
+function isInBuyWindow(ticker, tier) {
+  const d = priceData[ticker];
+  if (!d) return false;
+  const threshold = TIER_CONFIG[tier].threshold;
+  return (d.d1 !== null && d.d1 <= threshold) ||
+         (d.d5 !== null && d.d5 <= threshold) ||
+         (d.d10 !== null && d.d10 <= threshold);
+}
+
+function renderAll() { renderTierCards(); renderAlertBar(); renderStockList(); }
+
+function renderAlertBar() {
+  const alerts = WATCHLIST.filter(s => isInBuyWindow(s.ticker, s.tier));
+  const bar = document.getElementById("alert-bar");
+  if (!alerts.length) { bar.innerHTML = ""; return; }
+  bar.innerHTML = `<span class="alert-badge" style="color:#22c55e;background:#052e16;border:1px solid #166534">⚡ ${alerts.length} stock${alerts.length>1?"s":""} in buy window: ${alerts.map(s=>s.ticker).join(", ")}</span>`;
+}
+
+function renderTierCards() {
+  const c = document.getElementById("tier-cards");
+  c.innerHTML = [1,2,3,4].map(t => {
+    const tc = TIER_CONFIG[t];
+    const count = WATCHLIST.filter(s => s.tier === t).length;
+    const ac = WATCHLIST.filter(s => s.tier === t && isInBuyWindow(s.ticker, t)).length;
+    const ia = activeTier === t;
+    return `<div class="tier-card" onclick="filterTier(${t},null)" style="background:${ia?tc.bg:"#0f172a"};border-color:${ia?tc.border:"#1e293b"}">
+      <div class="tier-card-label" style="color:${tc.color}">${tc.dot} T${t}</div>
+      <div class="tier-card-count">${count} names</div>
+      ${ac?`<div class="tier-card-alert" style="color:${tc.color}">⚡ ${ac} in window</div>`:""}
+      <div class="tier-card-trigger" style="color:${tc.color}">${tc.dipTrigger}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderStockList() {
+  const filtered = WATCHLIST.filter(s =>
+    (activeTier === "All" || s.tier === activeTier) &&
+    (activeTheme === "All" || s.theme === activeTheme)
+  );
+  const grouped = [1,2,3,4].reduce((a,t)=>{a[t]=filtered.filter(s=>s.tier===t);return a;},{});
+  let html = "";
+
+  for (const t of [1,2,3,4]) {
+    const stocks = grouped[t];
+    if (!stocks.length) continue;
+    const tc = TIER_CONFIG[t];
+    html += `<div class="tier-section">
+      <div class="tier-heading">
+        <div class="tier-bar" style="background:${tc.color}"></div>
+        <span class="tier-heading-label" style="color:${tc.color}">${tc.label}</span>
+        <span class="tier-heading-sub">· ${tc.tagline}</span>
+      </div>`;
+
+    for (const s of stocks) {
+      const d = priceData[s.ticker];
+      const inWindow = isInBuyWindow(s.ticker, t);
+      const checks = Object.values(checklist[s.ticker]||{}).filter(Boolean).length;
+      const isExp = expandedTicker === s.ticker;
+
+      // Price display
+      let priceHTML = `<div class="loading-pulse">loading…</div>`;
+      if (d?.error) priceHTML = `<div style="font-size:11px;color:#475569">N/A</div>`;
+      else if (d?.current) priceHTML = `
+        <div class="price-val">$${d.current.toFixed(2)}</div>
+        <div class="price-change" style="color:${(d.change1d||0)>=0?"#22c55e":"#f87171"}">${(d.change1d||0)>=0?"▲":"▼"}${Math.abs(d.change1d||0).toFixed(2)}%</div>`;
+
+      // Speed columns: 1D, 5D, 10D drops
+      function dropCell(val) {
+        if (val === null || val === undefined) return `<div style="font-size:11px;color:#1e293b">—</div>`;
+        return `<div class="dip-val" style="color:${getDipColor(val)}">${val.toFixed(1)}%</div>`;
+      }
+
+      const d1HTML = d ? dropCell(d.d1) : `<div class="loading-pulse" style="font-size:10px">…</div>`;
+      const d5HTML = d ? dropCell(d.d5) : `<div class="loading-pulse" style="font-size:10px">…</div>`;
+      const d10HTML = d ? dropCell(d.d10) : `<div class="loading-pulse" style="font-size:10px">…</div>`;
+
+      html += `<div class="stock-card${inWindow?" alert":""}" style="--tier-border:${tc.border};--tier-bg:${tc.bg}${inWindow?";background:"+tc.bg+";border-color:"+tc.border:""}">
+        <div class="stock-row" onclick="toggleExpand('${s.ticker}')">
+          <div class="stock-ticker">
+            <div class="ticker-text" style="color:${tc.color}">${s.ticker}</div>
+            ${inWindow?`<div class="alert-tag" style="color:${tc.color}">⚡ BUY WINDOW</div>`:""}
+          </div>
+          <div class="stock-info">
+            <div class="stock-name">${s.name}</div>
+            <span class="theme-badge" style="color:${THEME_COLORS[s.theme]||"#94a3b8"}">${s.theme}</span>
+          </div>
+          <div class="stock-price">${priceHTML}</div>
+          <div class="stock-speed">${d1HTML}<div class="speed-label">1 day</div></div>
+          <div class="stock-speed">${d5HTML}<div class="speed-label">5 days</div></div>
+          <div class="stock-speed">${d10HTML}<div class="speed-label">10 days</div></div>
+          ${checks>0?`<div class="check-badge">${checks}/7</div>`:""}
+          <div class="chevron">${isExp?"▲":"▼"}</div>
+        </div>`;
+
+      if (isExp) {
+        // Speed signal
+        const sig = d ? getSpeedSignal(d.d1, d.d5, d.d10, t) : null;
+        const speedPanelHTML = d && !d.error ? `
+          <div class="speed-panel">
+            <div class="speed-panel-title">⚡ Drop Speed Analysis (Trading Days)</div>
+            <div class="speed-bars">
+              <div class="speed-bar-item">
+                <div class="speed-bar-label">1-Day Drop</div>
+                <div class="speed-bar-val" style="color:${getDipColor(d.d1)}">${d.d1!==null?d.d1.toFixed(1)+"%":"—"}</div>
+                <div class="speed-bar-sub">vs prior close</div>
+              </div>
+              <div class="speed-bar-item">
+                <div class="speed-bar-label">5-Day Drop</div>
+                <div class="speed-bar-val" style="color:${getDipColor(d.d5)}">${d.d5!==null?d.d5.toFixed(1)+"%":"—"}</div>
+                <div class="speed-bar-sub">~1 week</div>
+              </div>
+              <div class="speed-bar-item">
+                <div class="speed-bar-label">10-Day Drop</div>
+                <div class="speed-bar-val" style="color:${getDipColor(d.d10)}">${d.d10!==null?d.d10.toFixed(1)+"%":"—"}</div>
+                <div class="speed-bar-sub">~2 weeks</div>
+              </div>
+            </div>
+            ${sig ? `<div class="speed-signal" style="background:${sig.bg};color:${sig.color};border:1px solid ${sig.color}33">${sig.signal} — ${sig.msg}</div>` : `<div class="speed-signal" style="background:#0a0f1a;color:#475569">📊 No alert threshold hit in last 10 trading days</div>`}
+          </div>` : "";
+
+        // Price cells
+        const priceGridHTML = d && !d.error && d.current ? `
+          <div class="price-grid">
+            <div class="price-cell"><div class="price-cell-label">Current</div><div class="price-cell-val">$${d.current.toFixed(2)}</div></div>
+            <div class="price-cell"><div class="price-cell-label">Prev Close</div><div class="price-cell-val">${d.prevClose?"$"+d.prevClose.toFixed(2):"—"}</div></div>
+            <div class="price-cell"><div class="price-cell-label">1D Chg</div><div class="price-cell-val" style="color:${getDipColor(d.d1)}">${d.d1!==null?d.d1.toFixed(1)+"%":"—"}</div></div>
+            <div class="price-cell"><div class="price-cell-label">5D Chg</div><div class="price-cell-val" style="color:${getDipColor(d.d5)}">${d.d5!==null?d.d5.toFixed(1)+"%":"—"}</div></div>
+            <div class="price-cell"><div class="price-cell-label">10D Chg</div><div class="price-cell-val" style="color:${getDipColor(d.d10)}">${d.d10!==null?d.d10.toFixed(1)+"%":"—"}</div></div>
+          </div>` : "";
+
+        const checkItems = [
+          ["Is the core business model still intact?","Earnings/revenue trend still positive?"],
+          ["Is the drop macro/sector-wide, not company-specific?","Whole sector sold off, not just this name?"],
+          ["Are earnings/revenue still growing?","Most recent quarter still showing growth?"],
+          ["Is the competitive moat unchanged?","Pricing power, switching costs, or network effects intact?"],
+          ["Any insider buying into the dip?","Check SEC Form 4s in last 30 days."],
+          ["No new governance or legal issues?","No new DOJ, SEC, accounting, or auditor issues?"],
+          ["Does my original thesis still hold?","The reason you'd own this — is it unchanged?"],
+        ];
+
+        const clHTML = checkItems.map((item,idx) => {
+          const ck = checklist[s.ticker]?.[idx];
+          return `<div class="check-item" onclick="toggleCheck('${s.ticker}',${idx})">
+            <div class="check-box${ck?" checked":""}">${ck?"✓":""}</div>
+            <div>
+              <div class="check-q" style="color:${ck?"#475569":"#cbd5e1"}">${item[0]}</div>
+              <div class="check-hint">${item[1]}</div>
+            </div>
+          </div>`;
+        }).join("");
+
+        const sc = checks>=6?"#22c55e":checks>=4?"#fbbf24":"#64748b";
+        const sm = checks>=6?"Strong buy signal":checks>=4?"Proceed with caution":checks>0?"Insufficient confidence":"Run checklist before buying";
+
+        html += `<div class="stock-detail" style="border-top-color:${tc.border}">
+          ${speedPanelHTML}
+          ${priceGridHTML}
+          <div class="info-grid">
+            <div class="info-cell"><div class="info-cell-label">Moat</div><div class="info-cell-val">${s.moat}</div></div>
+            <div class="info-cell"><div class="info-cell-label">Key Risk</div><div class="info-cell-val">${s.keyRisk}</div></div>
+          </div>
+          <div class="checklist-box">
+            <div class="checklist-title">Fear vs. Fundamental Check</div>
+            ${clHTML}
+            <div class="check-score" style="color:${sc}">${checks}/7 · ${sm}</div>
+          </div>
+        </div>`;
+      }
+
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+
+  document.getElementById("stock-list").innerHTML = html;
+}
+
+function toggleExpand(t) { expandedTicker = expandedTicker===t?null:t; renderStockList(); }
+function toggleCheck(t,idx) { if(!checklist[t])checklist[t]={}; checklist[t][idx]=!checklist[t][idx]; renderStockList(); }
+function filterTier(tier,btn) {
+  activeTier = activeTier===tier?"All":tier;
+  document.querySelectorAll(".tier-btn").forEach(b=>b.classList.remove("active"));
+  if(btn) btn.classList.toggle("active", activeTier!=="All");
+  else document.querySelectorAll(".tier-btn")[0].classList.add("active");
+  renderAll();
+}
+function filterTheme(theme) { activeTheme=theme; renderAll(); }
+function switchTab(tab,btn) {
+  document.getElementById("tab-watchlist").classList.toggle("hidden", tab!=="watchlist");
+  document.getElementById("tab-checklist").classList.toggle("hidden", tab!=="checklist");
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+}
+
+// Show CORS warning if opened from local file
+if (window.location.protocol === 'file:') {
+  document.getElementById('cors-warning').style.display = 'block';
+}
+renderAll();
+fetchAllPrices();
+</script>
+</body>
+</html>
