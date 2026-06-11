@@ -316,51 +316,81 @@ async function analyzeQuestion(ticker, idx, question, companyName) {
   const d5 = priceInfo?.d5 ? priceInfo.d5.toFixed(1)+'%' : 'unknown';
   const d10 = priceInfo?.d10 ? priceInfo.d10.toFixed(1)+'%' : 'unknown';
 
-  const systemPrompt = `You are a senior equity analyst specializing in US equities. 
-Today is ${new Date().toDateString()}. 
-Use your knowledge of recent earnings reports, SEC filings, news, and market data up to your training cutoff.
-Be specific — cite actual figures, quarters, dates where you know them.
-Always respond with valid JSON only. No markdown fences. No preamble.`;
+  const systemPrompt = 'You are a senior equity analyst. Today is ' + new Date().toDateString() + '. You have access to web search — use it to find the latest earnings, news, SEC filings, and insider activity for the stock before answering. Always respond with valid JSON only after researching. No markdown fences. No preamble.';
 
-  const userPrompt = `Stock: ${companyName} (${ticker})
-Known moat: ${moat}
-Known risk: ${keyRisk}
-Recent price change: 1-day: ${d1}, 5-day: ${d5}, 10-day: ${d10}
-
-Due diligence question: "${question}"
-
-Answer based on your knowledge of this company's fundamentals, recent earnings, news, and market position.
-Respond ONLY with this JSON (no markdown, no extra text):
-{"verdict":"PASS","summary":"your 2-3 sentence analysis with specific data points"}
-
-verdict must be exactly "PASS", "FAIL", or "UNCLEAR".
-PASS = evidence supports yes. FAIL = evidence says no. UNCLEAR = genuinely insufficient data.
-Be decisive — only use UNCLEAR if you truly have no relevant knowledge of this company.`;
+  const userPrompt = 'Stock: ' + companyName + ' (' + ticker + ')\n' +
+    'Known moat: ' + moat + '\n' +
+    'Known risk: ' + keyRisk + '\n' +
+    'Recent price change: 1-day: ' + d1 + ', 5-day: ' + d5 + ', 10-day: ' + d10 + '\n\n' +
+    'Due diligence question: "' + question + '"\n\n' +
+    'Search the web for the latest information on this company, then answer the question.\n' +
+    'Respond ONLY with this JSON after your research:\n' +
+    '{"verdict":"PASS","summary":"2-3 sentence analysis with specific recent data, figures, and dates"}\n\n' +
+    'verdict must be exactly "PASS", "FAIL", or "UNCLEAR".';
 
   try {
+    // First call — may trigger web search (returns tool_use blocks)
     const res = await fetch("https://anthropic-proxy.harrison-mi100.workers.dev", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
-        max_tokens: 500,
+        max_tokens: 2000,
         system: systemPrompt,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: userPrompt }]
       })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
-    const textBlock = data.content?.find(b => b.type === 'text');
-    if (!textBlock) throw new Error("No text block");
-    const raw = textBlock.text.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(raw);
+
+    let finalText = null;
+
+    // If stop_reason is tool_use, we need to send tool results back
+    if (data.stop_reason === 'tool_use') {
+      // Build tool results from all tool_use blocks
+      const toolResults = data.content
+        .filter(b => b.type === 'tool_use')
+        .map(b => ({ type: 'tool_result', tool_use_id: b.id, content: b.content || '' }));
+
+      // Second call with tool results
+      const res2 = await fetch("https://anthropic-proxy.harrison-mi100.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5",
+          max_tokens: 1000,
+          system: systemPrompt,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          messages: [
+            { role: "user", content: userPrompt },
+            { role: "assistant", content: data.content },
+            { role: "user", content: toolResults }
+          ]
+        })
+      });
+      const data2 = await res2.json();
+      if (data2.error) throw new Error(data2.error.message);
+      const tb = data2.content?.find(b => b.type === 'text');
+      if (tb) finalText = tb.text;
+    } else {
+      const tb = data.content?.find(b => b.type === 'text');
+      if (tb) finalText = tb.text;
+    }
+
+    if (!finalText) throw new Error("No text in response");
+    const raw = finalText.replace(/```json|```/g,'').trim();
+    // Extract JSON even if there's surrounding text
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("No JSON found in response");
+    const parsed = JSON.parse(match[0]);
     aiAnswers[key] = parsed;
     if (parsed.verdict === 'PASS') {
       if (!checklist[ticker]) checklist[ticker] = {};
       checklist[ticker][idx] = true;
     }
   } catch(e) {
-    aiAnswers[key] = { verdict: 'UNCLEAR', summary: 'Parse error — try re-analyzing: ' + e.message };
+    aiAnswers[key] = { verdict: 'UNCLEAR', summary: 'Error: ' + e.message };
   }
   renderStockList();
 }
