@@ -346,7 +346,11 @@ Respond in JSON only, no markdown, no explanation outside JSON:
   renderStockList();
 }
 
-async function analyzeAll(ticker, companyName) {
+async function analyzeAll(ticker) {
+  const stock = WATCHLIST.find(s => s.ticker === ticker);
+  const companyName = stock ? stock.name : ticker;
+  const btn = document.getElementById('analyze-btn-' + ticker);
+  if (btn) { btn.disabled = true; btn.textContent = '🤖 Analyzing...'; }
   const questions = [
     "Is the core business model still intact?",
     "Is the drop macro/sector-wide, not company-specific?",
@@ -357,9 +361,11 @@ async function analyzeAll(ticker, companyName) {
     "Does my original thesis still hold?"
   ];
   for (let idx = 0; idx < questions.length; idx++) {
+    if (btn) btn.textContent = `🤖 Analyzing question ${idx+1}/7...`;
     await analyzeQuestion(ticker, idx, questions[idx], companyName);
     await new Promise(r => setTimeout(r, 500));
   }
+  if (btn) { btn.disabled = false; btn.textContent = `✅ Analysis Complete — Re-run?`; }
 }
 
 // Get unix timestamps for N trading days ago (approximate: 1 day = 86400s, skip weekends roughly)
@@ -662,7 +668,7 @@ function renderStockList() {
                 <div class="check-q" style="color:${ck?"#475569":"#cbd5e1"}">${item[0]}</div>
                 <div class="check-hint">${item[1]}</div>
               </div>
-              <button class="ai-btn${aiData==='loading'?' loading':''}" onclick="event.stopPropagation();analyzeQuestion('${s.ticker}',${idx},'${item[0].replace(/'/g,"\'")}','${s.name}')" ${aiData==='loading'?'disabled':''}>
+              <button class="ai-btn${aiData==='loading'?' loading':''}" data-ticker="${s.ticker}" data-idx="${idx}" data-name="${s.name}" onclick="event.stopPropagation();analyzeQuestion(this.dataset.ticker,this.dataset.idx,${JSON.stringify(item[0])},this.dataset.name)" ${aiData==='loading'?'disabled':''}>
                 ${aiData && aiData!=='loading' ? '↻ Re-analyze' : '🤖 Analyze'}
               </button>
             </div>
@@ -682,7 +688,7 @@ function renderStockList() {
           </div>
           <div class="checklist-box">
             <div class="checklist-title">Fear vs. Fundamental Check</div>
-            <button class="analyze-all-btn" onclick="analyzeAll('${s.ticker}','${s.name}')">🤖 Auto-Analyze All 7 Questions for ${s.ticker}</button>
+            <button class="analyze-all-btn" id="analyze-btn-${s.ticker}" data-ticker="${s.ticker}" onclick="analyzeAll(this.dataset.ticker)">🤖 Auto-Analyze All 7 Questions for ${s.ticker}</button>
             ${clHTML}
             <div class="check-score" style="color:${sc}">${checks}/7 · ${sm}</div>
           </div>
