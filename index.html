@@ -135,7 +135,8 @@
         </div>
         <div id="refresh-wrap">
           <div style="font-size:11px;color:#475569;margin-bottom:4px" id="last-updated"></div>
-          <button class="refresh-btn" id="refresh-btn" onclick="fetchAllPrices()">⟳ Refresh Prices</button>
+          <button class="refresh-btn" id="refresh-btn" onclick="fetchAllPrices()">⟳ Refresh All</button>
+          <button class="refresh-btn" id="retry-btn" onclick="retryMissing()" style="margin-top:4px;background:#0c1a0c;border-color:#166534;color:#22c55e">↻ Retry Missing</button>
         </div>
       </div>
     </div>
@@ -385,7 +386,11 @@ async function fetchAllPrices() {
     try {
       let candles = await fetchCandles(s.ticker);
       if (!candles) {
-        await new Promise(r => setTimeout(r, 1200));
+        await new Promise(r => setTimeout(r, 1500));
+        candles = await fetchCandles(s.ticker);
+      }
+      if (!candles) {
+        await new Promise(r => setTimeout(r, 2500));
         candles = await fetchCandles(s.ticker);
       }
       const currentPrice = priceData[s.ticker]?.current;
@@ -402,6 +407,37 @@ async function fetchAllPrices() {
   document.getElementById("last-updated").textContent = "Updated " + new Date().toLocaleTimeString();
   btn.disabled = false;
   btn.innerHTML = "⟳ Refresh Prices";
+}
+
+async function retryMissing() {
+  const missing = WATCHLIST.filter(s => {
+    const d = priceData[s.ticker];
+    return d && !d.error && (d.d5 === null || d.d10 === null);
+  });
+  if (!missing.length) { alert("No missing data to retry!"); return; }
+  const btn = document.getElementById("retry-btn");
+  btn.disabled = true;
+  btn.textContent = `↻ Retrying ${missing.length}...`;
+  for (const s of missing) {
+    btn.textContent = `↻ ${s.ticker}...`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      try {
+        const candles = await fetchCandles(s.ticker);
+        if (candles) {
+          const currentPrice = priceData[s.ticker]?.current;
+          priceData[s.ticker].candles = candles;
+          priceData[s.ticker].d5 = calcDrop(currentPrice, candles, 5);
+          priceData[s.ticker].d10 = calcDrop(currentPrice, candles, 10);
+          renderAll();
+          break;
+        }
+      } catch(e) {}
+    }
+    await new Promise(r => setTimeout(r, 800));
+  }
+  btn.disabled = false;
+  btn.textContent = "↻ Retry Missing";
 }
 
 function getDipColor(pct) {
