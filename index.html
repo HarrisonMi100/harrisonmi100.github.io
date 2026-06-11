@@ -353,35 +353,47 @@ async function fetchAllPrices() {
   document.getElementById("progress-wrap").classList.remove("hidden");
   document.getElementById("refresh-wrap").classList.add("hidden");
 
+  // Phase 1: fetch all quotes first (Finnhub, fast) — populates 1D immediately
   for (let i = 0; i < WATCHLIST.length; i++) {
     const s = WATCHLIST[i];
-    const pct = Math.round(((i+1)/WATCHLIST.length)*100);
-    document.getElementById("progress-label").textContent = `Fetching ${s.ticker}… ${pct}%`;
+    const pct = Math.round(((i+1)/WATCHLIST.length)*50);
+    document.getElementById("progress-label").textContent = `Quotes: ${s.ticker} (${pct}%)`;
     document.getElementById("progress-fill").style.width = pct + "%";
-
     try {
-      const [quote, candles] = await Promise.all([
-        fetchQuote(s.ticker),
-        fetchCandles(s.ticker)
-      ]);
-
-      const currentPrice = quote.c;
-      // 1D: use quote directly for accuracy
+      const quote = await fetchQuote(s.ticker);
       const d1 = (quote.c && quote.pc && quote.pc !== 0) ? ((quote.c - quote.pc)/quote.pc*100) : null;
-      const d5 = calcDrop(currentPrice, candles, 5);
-      const d10 = calcDrop(currentPrice, candles, 10);
-
       priceData[s.ticker] = {
         current: quote.c || null,
         prevClose: quote.pc || null,
-        change1d: (quote.c && quote.pc) ? ((quote.c - quote.pc)/quote.pc*100) : null,
-        d1, d5, d10,
-        candles,
+        change1d: d1,
+        d1, d5: null, d10: null, candles: null,
       };
     } catch(e) {
       priceData[s.ticker] = { error: true };
     }
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 150));
+    renderAll();
+  }
+
+  // Phase 2: fetch historical candles one at a time with 800ms gap to avoid rate limiting
+  for (let i = 0; i < WATCHLIST.length; i++) {
+    const s = WATCHLIST[i];
+    const pct = 50 + Math.round(((i+1)/WATCHLIST.length)*50);
+    document.getElementById("progress-label").textContent = `History: ${s.ticker} (${pct}%)`;
+    document.getElementById("progress-fill").style.width = pct + "%";
+    if (priceData[s.ticker]?.error) continue;
+    try {
+      let candles = await fetchCandles(s.ticker);
+      if (!candles) {
+        await new Promise(r => setTimeout(r, 1200));
+        candles = await fetchCandles(s.ticker);
+      }
+      const currentPrice = priceData[s.ticker]?.current;
+      priceData[s.ticker].candles = candles;
+      priceData[s.ticker].d5 = calcDrop(currentPrice, candles, 5);
+      priceData[s.ticker].d10 = calcDrop(currentPrice, candles, 10);
+    } catch(e) {}
+    await new Promise(r => setTimeout(r, 800));
     renderAll();
   }
 
