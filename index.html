@@ -298,22 +298,35 @@ function tradingDaysAgo(n) {
 }
 
 async function fetchCandles(ticker) {
-  // Use allorigins CORS proxy to bypass Yahoo Finance CORS restriction
-  try {
-    const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=20d`;
-    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(yahoo)}`;
-    const res = await fetch(proxy);
-    const wrapper = await res.json();
-    if (!wrapper?.contents) return null;
-    const data = JSON.parse(wrapper.contents);
-    const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
-    if (!closes || closes.length < 2) return null;
-    const clean = closes.filter(v => v !== null && v !== undefined && v > 0);
-    if (clean.length < 5) return null;
-    return { c: clean };
-  } catch(e) {
-    return null;
+  // Try multiple CORS proxies in sequence until one works
+  const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=20d`;
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(yahoo)}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(yahoo)}`,
+    `https://thingproxy.freeboard.io/fetch/${yahoo}`,
+  ];
+
+  for (const proxyUrl of proxies) {
+    try {
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const raw = await res.text();
+      // allorigins wraps in {contents:...}, others return raw JSON
+      let data;
+      try {
+        const wrapper = JSON.parse(raw);
+        data = wrapper.contents ? JSON.parse(wrapper.contents) : wrapper;
+      } catch(e) { continue; }
+      const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+      if (!closes || closes.length < 2) continue;
+      const clean = closes.filter(v => v !== null && v !== undefined && v > 0);
+      if (clean.length < 5) continue;
+      return { c: clean };
+    } catch(e) {
+      continue; // try next proxy
+    }
   }
+  return null;
 }
 
 async function fetchQuote(ticker) {
