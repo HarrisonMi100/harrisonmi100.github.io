@@ -338,7 +338,7 @@ PASS = evidence supports yes. FAIL = evidence says no. UNCLEAR = genuinely insuf
 Be decisive — only use UNCLEAR if you truly have no relevant knowledge of this company.`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://anthropic-proxy.harrison-mi100.workers.dev", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
