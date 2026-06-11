@@ -308,14 +308,34 @@ async function analyzeQuestion(ticker, idx, question, companyName) {
   aiAnswers[key] = 'loading';
   renderStockList();
 
-  const prompt = `You are a senior equity analyst. A stock (${companyName}, ticker: ${ticker}) has recently dropped in price.
-Answer this specific due diligence question: "${question}"
+  const stock = WATCHLIST.find(s => s.ticker === ticker);
+  const moat = stock ? stock.moat : '';
+  const keyRisk = stock ? stock.keyRisk : '';
+  const priceInfo = priceData[ticker];
+  const d1 = priceInfo?.d1 ? priceInfo.d1.toFixed(1)+'%' : 'unknown';
+  const d5 = priceInfo?.d5 ? priceInfo.d5.toFixed(1)+'%' : 'unknown';
+  const d10 = priceInfo?.d10 ? priceInfo.d10.toFixed(1)+'%' : 'unknown';
 
-Respond in JSON only, no markdown, no explanation outside JSON:
-{
-  "verdict": "PASS" | "FAIL" | "UNCLEAR",
-  "summary": "2-3 sentence analysis based on recent news, earnings, and fundamentals. Be specific with numbers and dates where possible."
-}`;
+  const systemPrompt = `You are a senior equity analyst specializing in US equities. 
+Today is ${new Date().toDateString()}. 
+Use your knowledge of recent earnings reports, SEC filings, news, and market data up to your training cutoff.
+Be specific — cite actual figures, quarters, dates where you know them.
+Always respond with valid JSON only. No markdown fences. No preamble.`;
+
+  const userPrompt = `Stock: ${companyName} (${ticker})
+Known moat: ${moat}
+Known risk: ${keyRisk}
+Recent price change: 1-day: ${d1}, 5-day: ${d5}, 10-day: ${d10}
+
+Due diligence question: "${question}"
+
+Answer based on your knowledge of this company's fundamentals, recent earnings, news, and market position.
+Respond ONLY with this JSON (no markdown, no extra text):
+{"verdict":"PASS","summary":"your 2-3 sentence analysis with specific data points"}
+
+verdict must be exactly "PASS", "FAIL", or "UNCLEAR".
+PASS = evidence supports yes. FAIL = evidence says no. UNCLEAR = genuinely insufficient data.
+Be decisive — only use UNCLEAR if you truly have no relevant knowledge of this company.`;
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -323,25 +343,24 @@ Respond in JSON only, no markdown, no explanation outside JSON:
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content: prompt }]
+        max_tokens: 500,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }]
       })
     });
     const data = await res.json();
-    // Extract text from response (may include tool use blocks)
+    if (data.error) throw new Error(data.error.message);
     const textBlock = data.content?.find(b => b.type === 'text');
     if (!textBlock) throw new Error("No text block");
     const raw = textBlock.text.replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(raw);
     aiAnswers[key] = parsed;
-    // Auto-check the box if PASS
     if (parsed.verdict === 'PASS') {
       if (!checklist[ticker]) checklist[ticker] = {};
       checklist[ticker][idx] = true;
     }
   } catch(e) {
-    aiAnswers[key] = { verdict: 'UNCLEAR', summary: 'Analysis unavailable — please check manually.' };
+    aiAnswers[key] = { verdict: 'UNCLEAR', summary: 'Parse error — try re-analyzing: ' + e.message };
   }
   renderStockList();
 }
