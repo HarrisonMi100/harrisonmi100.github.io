@@ -650,49 +650,51 @@ function renderStockList() {
           ["Does my original thesis still hold?","The reason you'd own this — is it unchanged?"],
         ];
 
-        const clHTML = checkItems.map((item,idx) => {
-          const ck = checklist[s.ticker]?.[idx];
+        // Build checklist using string concat to avoid nested backtick issues
+        let clHTML = '';
+        checkItems.forEach(function(item, idx) {
+          const ck = checklist[s.ticker] && checklist[s.ticker][idx];
           const aiKey = s.ticker + '_' + idx;
           const aiData = aiAnswers[aiKey];
           let aiHTML = '';
           if (aiData === 'loading') {
-            aiHTML = `<div class="ai-answer"><span style="animation:pulse 1s infinite;display:inline-block">🤖 Analyzing with AI…</span></div>`;
-          } else if (aiData) {
+            aiHTML = '<div class="ai-answer"><span style="animation:pulse 1s infinite;display:inline-block">🤖 Analyzing with AI…</span></div>';
+          } else if (aiData && aiData !== 'loading') {
             const vcolor = aiData.verdict==='PASS'?'pass':aiData.verdict==='FAIL'?'fail':'unclear';
-            aiHTML = `<div class="ai-answer"><div class="verdict ${vcolor}">${aiData.verdict==='PASS'?'✅':aiData.verdict==='FAIL'?'❌':'⚠️'} ${aiData.verdict}</div>${aiData.summary}</div>`;
+            const icon = aiData.verdict==='PASS'?'✅':aiData.verdict==='FAIL'?'❌':'⚠️';
+            aiHTML = '<div class="ai-answer"><div class="verdict ' + vcolor + '">' + icon + ' ' + aiData.verdict + '</div>' + (aiData.summary||'') + '</div>';
           }
-          return `<div class="check-item" style="flex-direction:column;align-items:stretch;gap:4px">
-            <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleCheck('${s.ticker}',${idx})">
-              <div class="check-box${ck?" checked":""}">${ck?"✓":""}</div>
-              <div style="flex:1">
-                <div class="check-q" style="color:${ck?"#475569":"#cbd5e1"}">${item[0]}</div>
-                <div class="check-hint">${item[1]}</div>
-              </div>
-              <button class="ai-btn${aiData==='loading'?' loading':''}" data-ticker="${s.ticker}" data-idx="${idx}" data-name="${s.name}" onclick="event.stopPropagation();analyzeQuestion(this.dataset.ticker,this.dataset.idx,${JSON.stringify(item[0])},this.dataset.name)" ${aiData==='loading'?'disabled':''}>
-                ${aiData && aiData!=='loading' ? '↻ Re-analyze' : '🤖 Analyze'}
-              </button>
-            </div>
-            ${aiHTML}
-          </div>`;
-        }).join("");
+          const btnLabel = (aiData && aiData !== 'loading') ? '↻ Re-analyze' : '🤖 Analyze';
+          const btnDisabled = aiData === 'loading' ? 'disabled' : '';
+          const btnClass = 'ai-btn' + (aiData==='loading'?' loading':'');
+          const checkClass = 'check-box' + (ck?' checked':'');
+          const checkMark = ck ? '✓' : '';
+          const qColor = ck ? '#475569' : '#cbd5e1';
+          clHTML += '<div class="check-item" style="flex-direction:column;align-items:stretch;gap:4px">';
+          clHTML += '<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleCheck('' + s.ticker + '',' + idx + ')">';
+          clHTML += '<div class="' + checkClass + '">' + checkMark + '</div>';
+          clHTML += '<div style="flex:1"><div class="check-q" style="color:' + qColor + '">' + item[0] + '</div><div class="check-hint">' + item[1] + '</div></div>';
+          clHTML += '<button class="' + btnClass + '" data-ticker="' + s.ticker + '" data-idx="' + idx + '" data-question="' + item[0].replace(/"/g,'&quot;') + '" data-name="' + s.name.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();analyzeQuestion(this.dataset.ticker,parseInt(this.dataset.idx),this.dataset.question,this.dataset.name)" ' + btnDisabled + '>' + btnLabel + '</button>';
+          clHTML += '</div>' + aiHTML + '</div>';
+        });
 
         const sc = checks>=6?"#22c55e":checks>=4?"#fbbf24":"#64748b";
         const sm = checks>=6?"Strong buy signal":checks>=4?"Proceed with caution":checks>0?"Insufficient confidence":"Run checklist before buying";
 
-        html += `<div class="stock-detail" style="border-top-color:${tc.border}">
-          ${speedPanelHTML}
-          ${priceGridHTML}
-          <div class="info-grid">
-            <div class="info-cell"><div class="info-cell-label">Moat</div><div class="info-cell-val">${s.moat}</div></div>
-            <div class="info-cell"><div class="info-cell-label">Key Risk</div><div class="info-cell-val">${s.keyRisk}</div></div>
-          </div>
-          <div class="checklist-box">
-            <div class="checklist-title">Fear vs. Fundamental Check</div>
-            <button class="analyze-all-btn" id="analyze-btn-${s.ticker}" data-ticker="${s.ticker}" onclick="analyzeAll(this.dataset.ticker)">🤖 Auto-Analyze All 7 Questions for ${s.ticker}</button>
-            ${clHTML}
-            <div class="check-score" style="color:${sc}">${checks}/7 · ${sm}</div>
-          </div>
-        </div>`;
+        let detailHTML = '<div class="stock-detail" style="border-top-color:' + tc.border + '">';
+        detailHTML += speedPanelHTML;
+        detailHTML += priceGridHTML;
+        detailHTML += '<div class="info-grid">';
+        detailHTML += '<div class="info-cell"><div class="info-cell-label">Moat</div><div class="info-cell-val">' + s.moat + '</div></div>';
+        detailHTML += '<div class="info-cell"><div class="info-cell-label">Key Risk</div><div class="info-cell-val">' + s.keyRisk + '</div></div>';
+        detailHTML += '</div>';
+        detailHTML += '<div class="checklist-box">';
+        detailHTML += '<div class="checklist-title">Fear vs. Fundamental Check</div>';
+        detailHTML += '<button class="analyze-all-btn" id="analyze-btn-' + s.ticker + '" data-ticker="' + s.ticker + '" onclick="analyzeAll(this.dataset.ticker)">🤖 Auto-Analyze All 7 for ' + s.ticker + '</button>';
+        detailHTML += clHTML;
+        detailHTML += '<div class="check-score" style="color:' + sc + '">' + checks + '/7 · ' + sm + '</div>';
+        detailHTML += '</div></div>';
+        html += detailHTML;
       }
 
       html += `</div>`;
